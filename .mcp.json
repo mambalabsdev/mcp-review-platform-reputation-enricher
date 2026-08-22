@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mamba-review-platform-reputation-enricher": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mambalabsdev/mcp-review-platform-reputation-enricher"
+      ],
+      "env": {
+        "APIFY_TOKEN": "your-apify-token"
+      }
+    }
+  }
+}
