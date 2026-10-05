@@ -1,0 +1,120 @@
+{
+  "_provenance": {
+    "actorId": "3lIqfCt61j4hqE1xz",
+    "buildId": "ATE3G1e5CwZl77I26",
+    "buildNumber": "0.3.6",
+    "readAt": "2026-10-05T15:44:51.923Z"
+  },
+  "title": "Trustpilot Rating Star Breakdown and Review Count Enricher Input",
+  "description": "Give a Trustpilot business unit id and get that company TrustScore, star score, total review count and the full one to five star breakdown in one flat row. Give a domain instead and the actor looks for the id in the company own TrustBox embed, which about one company in seven publishes, mostly UK consumer services. When it cannot find one the row says not_extractable, which means nobody could look, NOT that the company is absent from Trustpilot. Free Apify plan users get 1000 results per calendar month, reset monthly. Upgrade to any paid Apify plan for unlimited use: https://apify.com/pricing?fpr=mamba",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "company_domain": {
+      "title": "Company Domain",
+      "type": "string",
+      "description": "Bare company domain, for example monzo.com. Used to look for a Trustpilot business unit id in that company own widget embed. Supplying trustpilotBusinessUnitId instead skips this step and always resolves.",
+      "editor": "textfield",
+      "prefill": "monzo.com"
+    },
+    "company_name": {
+      "title": "Company Name",
+      "type": "string",
+      "description": "Optional. Carried through to the output row for joining. The lookup is keyed on the business unit id, so the name never changes which business is returned.",
+      "editor": "textfield",
+      "prefill": "Monzo"
+    },
+    "publicPageAccess": {
+      "title": "Public Page Access (advanced, off by default)",
+      "type": "string",
+      "description": "Leave at \"off\" (default) and this actor reads only Trustpilot public TrustBox data endpoint, which Trustpilot robots.txt explicitly allows. Set to \"unblocker\" and it will instead read Trustpilot public company pages through Apify Unblocker, which resolves any domain with no business unit id and also returns categories, claimed status and verification. Two things to know before you set it: Trustpilot robots.txt disallows those pages to automated agents, so this is your call and not a default, and it spends Unblocker units from your own Apify account. Every row records trustpilot_route, so your dataset always says which route produced it. Sent as a string for Clay compatibility.",
+      "editor": "select",
+      "enum": [
+        "off",
+        "unblocker"
+      ],
+      "enumTitles": [
+        "off (permitted widget route only, default)",
+        "unblocker (also read public company pages, your call, uses your Unblocker units)"
+      ],
+      "default": "off"
+    },
+    "trustpilotBusinessUnitId": {
+      "title": "Trustpilot Business Unit ID",
+      "type": "string",
+      "description": "The 24 character Trustpilot business unit id, for example 57da77be0000ff000594bcdb. This is the fastest and most reliable input: supplied here it always resolves. Find it in the page source of any site running a Trustpilot widget, as data-businessunit-id. Leave it empty and the actor looks for it on the company own site.",
+      "editor": "textfield",
+      "prefill": ""
+    },
+    "minReviewCount": {
+      "title": "Minimum Review Count",
+      "type": "string",
+      "description": "Sets rating_is_meaningful on the row. A 5.0 rating from two reviews and a 4.2 from nine hundred are not comparable numbers, and this is the column that says which one you are looking at. It never drops a row and never changes the rating returned. Sent as a string for Clay compatibility.",
+      "editor": "select",
+      "enum": [
+        "none",
+        "10",
+        "50",
+        "100",
+        "500"
+      ],
+      "enumTitles": [
+        "none (return every rating, default)",
+        "10 reviews",
+        "50 reviews",
+        "100 reviews",
+        "500 reviews"
+      ],
+      "default": "none"
+    },
+    "includeCategories": {
+      "title": "Include Categories",
+      "type": "string",
+      "description": "Has no effect in this version. Trustpilot publishes a business categories only on its public company page, and that page is disallowed to us by Trustpilot own robots.txt, so trustpilot_categories is null on every row and trustpilot_categories_status says not_extractable. The setting is kept so saved configurations keep working. Sent as a string for Clay compatibility.",
+      "editor": "select",
+      "enum": [
+        "true",
+        "false"
+      ],
+      "enumTitles": [
+        "true (no effect in this version)",
+        "false (no effect in this version)"
+      ],
+      "default": "true"
+    },
+    "sources": {
+      "title": "Sources",
+      "type": "string",
+      "description": "Which review sources to query. This version serves Trustpilot only. G2, Capterra and Glassdoor appear as columns and always report skipped, with the reason on the row, because all three refused every documented route and none publishes an API we can use as documented. This setting exists so a saved configuration keeps working when a source is added. Sent as a string for Clay compatibility.",
+      "editor": "select",
+      "enum": [
+        "trustpilot"
+      ],
+      "enumTitles": [
+        "trustpilot (the only source in v1)"
+      ],
+      "default": "trustpilot"
+    },
+    "skipCache": {
+      "title": "Skip Cache",
+      "type": "string",
+      "description": "When \"false\" (default) a successful lookup is cached for seven days and reused, which costs you nothing on a repeated run. Set \"true\" to force a fresh fetch. Sent as a string for Clay compatibility.",
+      "editor": "select",
+      "enum": [
+        "false",
+        "true"
+      ],
+      "enumTitles": [
+        "false (use cache)",
+        "true (force fresh)"
+      ],
+      "default": "false"
+    },
+    "source_tag": {
+      "title": "Source Tag",
+      "type": "string",
+      "description": "Internal attribution tag set by Mamba Labs on published task examples. Not required, and nothing depends on it. Leave it empty.",
+      "editor": "textfield"
+    }
+  }
+}
