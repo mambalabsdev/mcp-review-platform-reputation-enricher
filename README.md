@@ -20,9 +20,11 @@ An MCP server that resolves a company domain to its Trustpilot rating, review co
 
 ## What it does
 
-Give it a company domain and it resolves that company's Trustpilot business unit and returns the TrustScore, review count, star score, the one to five star breakdown, claimed and verified status and categories, through Trustpilot's documented Business Units API. One flat row per company.
+Give it a Trustpilot business unit id, or a company domain, and it returns the TrustScore, review count, star score, and the one to five star breakdown. One flat row per company. By default it reads Trustpilot's public TrustBox data endpoint, which Trustpilot's robots.txt allows. No Trustpilot API key is needed.
 
-This route needs your own Trustpilot API key. Without one every row reports `skipped` rather than pretending to have looked. The tool keeps four kinds of empty apart: a refused request reports `blocked`, a domain with no business unit reports `not_found`, a value nobody could read reports `not_extractable`, and a source that was never queried reports `skipped`. G2, Capterra and Glassdoor ship as explicit skipped status columns, so the row shape does not change when a source is added.
+The business unit id is the reliable route: supplied, it always resolves. A domain alone resolves only when the company's own site embeds a Trustpilot widget, so most domains come back `not_found` without the id. A row's `trustpilot_business_id` can be fed back as the id on a later call. Setting `publicPageAccess` to `unblocker` reads Trustpilot's public company page through Apify Unblocker instead, which resolves a domain with no id and adds categories, claimed status, and verification. Trustpilot's robots.txt disallows those pages to automated agents, so that route is your call, and it spends Unblocker units from your own Apify account.
+
+The tool keeps four kinds of empty apart: a refused request reports `blocked`, a domain with no business unit reports `not_found`, a value nobody could read reports `not_extractable`, and a source that was never queried reports `skipped`. G2, Capterra and Glassdoor ship as explicit skipped status columns, so the row shape does not change when a source is added.
 
 All of the lookup runs on Apify. This package is a thin client that calls the actor and hands back the result unchanged.
 
@@ -48,34 +50,32 @@ Add this to your Claude Desktop config:
 
 Get your token at https://console.apify.com/account/integrations, paste it in, and restart Claude Desktop. The `get_trustpilot_reputation` tool will be available.
 
-You also need your own Trustpilot API key, free to create at developers.trustpilot.com. It is passed as a tool argument rather than an environment variable, so the model supplies it per call.
-
 ## Prerequisites
 
 - Node.js 18 or newer
 - An Apify account with an API token
-- Your own Trustpilot API key, free at developers.trustpilot.com. The Business Units API is not open, so this is required.
 
 ## Example prompts
 
-- "Get the Trustpilot rating for mattressonline.co.uk. Here is my Trustpilot key."
+- "Get the Trustpilot rating for the business unit 4992d8e10000640005041a9a."
 - "What is the star breakdown for this company on Trustpilot?"
 - "Look up this domain's Trustpilot reputation and flag it only if it has at least 100 reviews."
-- "Is this company's Trustpilot profile claimed and verified?"
+- "Is this company's Trustpilot profile claimed and verified? Use the public page route."
 
 ## Inputs
 
-- `company_domain` (optional): bare company domain, for example `stripe.com`. Trustpilot business units are keyed on the company website domain, so this is the correct and only lookup key.
-- `company_name` (optional): carried through to the output row for joining. The lookup is keyed on the domain, so the name does not change which business unit is returned.
-- `trustpilotApiKey` (optional in the schema, required in practice): your own Trustpilot API key, free to create at developers.trustpilot.com. Without a key the tool reports `skipped` rather than guessing.
+- `company_domain` (optional): bare company domain, for example `monzo.com`. Used to look for a Trustpilot business unit id in the company's own widget embed. Supplying `trustpilotBusinessUnitId` instead skips this step and always resolves.
+- `company_name` (optional): carried through to the output row for joining. The lookup is keyed on the business unit id, so the name never changes which business is returned.
+- `trustpilotBusinessUnitId` (optional): the 24 character Trustpilot business unit id, for example `57da77be0000ff000594bcdb`. The fastest and most reliable input. Find it in the page source of any site running a Trustpilot widget, as `data-businessunit-id`, or reuse `trustpilot_business_id` from an earlier row.
+- `publicPageAccess` (optional): `off` (the default) or `unblocker`. `unblocker` reads Trustpilot's public company page through Apify Unblocker, which resolves a domain with no id and adds categories, claimed status, and verification. A row resolved this way charges `public-page-profile-returned` instead of `reputation-resolved`, never both.
 - `minReviewCount` (optional): one of `none`, `10`, `50`, `100` or `500`. It sets `rating_is_meaningful` on the row. A 5.0 rating from two reviews and a 4.2 from nine hundred are not comparable numbers, and this is the column that says which one you are looking at. It never drops a row and never changes the rating returned.
-- `includeCategories` (optional): when true (the default) the Trustpilot categories the business is listed under are returned. They are a cheap proxy for what a company actually sells, which is often not what its homepage says.
+- `includeCategories` (optional): has no effect on the default route, because Trustpilot publishes categories only on its public company page. `trustpilot_categories` is null unless `publicPageAccess` is `unblocker`. Kept so saved configurations keep working.
 - `sources` (optional): which review sources to query. Version 1 serves `trustpilot` only. G2, Capterra and Glassdoor appear as columns and always report `skipped`, with the reason on the row. This setting exists so a saved configuration keeps working when a source is added.
 - `skipCache` (optional): when false (the default) a successful lookup is cached for seven days and reused. Set true to force a fresh fetch.
 
 ## Output
 
-The tool returns the actor's flat JSON row for the company, with 31 snake_case fields and no nested objects. `trustpilot_status` is the field to read before any rating, `trustpilot_route` and `trustpilot_id_source` say how the business unit was resolved, and `rating_is_meaningful` reflects the review count threshold you set. See the Apify Store page for the full output schema.
+The tool returns the actor's flat JSON row for the company, with 33 snake_case fields and no nested objects. `trustpilot_status` is the field to read before any rating, `trustpilot_route` and `trustpilot_id_source` say how the business unit was resolved, and `rating_is_meaningful` reflects the review count threshold you set. See the Apify Store page for the full output schema.
 
 ## Example output
 
@@ -116,10 +116,11 @@ The tool returns the actor's flat JSON row for the company, with 31 snake_case f
 
 - TrustScore, star score and total review count
 - The full one to five star breakdown, not just the average
-- Claimed and verified status, plus Trustpilot categories
+- Claimed and verified status, plus Trustpilot categories, on the optional public page route
 - Four kinds of empty, each with its own status, so a refusal is never a zero
 - G2, Capterra and Glassdoor ship as explicit skipped columns
-- 31 flat snake_case fields, one row per company
+- 33 flat snake_case fields, one row per company
+- No Trustpilot API key needed
 
 ## Full actor documentation
 
