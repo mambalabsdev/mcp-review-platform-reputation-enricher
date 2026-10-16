@@ -14,6 +14,7 @@ An MCP server that resolves a company domain to its Trustpilot rating, review co
 - [Output](#output)
 - [Example output](#example-output)
 - [Features](#features)
+- [Pricing](#pricing)
 - [Full actor documentation](#full-actor-documentation)
 - [Mamba Labs GTM Suite](#mamba-labs-gtm-suite)
 - [License](#license)
@@ -72,6 +73,7 @@ Get your token at https://console.apify.com/account/integrations, paste it in, a
 - `includeCategories` (optional): has no effect on the default route, because Trustpilot publishes categories only on its public company page. `trustpilot_categories` is null unless `publicPageAccess` is `unblocker`. Kept so saved configurations keep working.
 - `sources` (optional): which review sources to query. Version 1 serves `trustpilot` only. G2, Capterra and Glassdoor appear as columns and always report `skipped`, with the reason on the row. This setting exists so a saved configuration keeps working when a source is added.
 - `skipCache` (optional): when false (the default) a successful lookup is cached for seven days and reused. Set true to force a fresh fetch.
+- `max_charge_usd` (optional): spending cap for this call, in USD. The actor stops before any charge that would take the run past this amount and keeps every row already charged.
 
 ## Output
 
@@ -121,6 +123,19 @@ The tool returns the actor's flat JSON row for the company, with 33 snake_case f
 - G2, Capterra and Glassdoor ship as explicit skipped columns
 - 33 flat snake_case fields, one row per company
 - No Trustpilot API key needed
+
+## Pricing
+
+You pay per event on Apify, billed to your own Apify account. Prices from the live pricing record, read 2026-10-16:
+
+| Event | Price per event (USD) | Fires when |
+| --- | --- | --- |
+| `apify-actor-start` | $0.00005 | Charged when the Actor starts running. Number of events charged depends on Actor memory (one event per GB, minimum one event). |
+| `company-checked` | $0.003 on the Free plan, down to $0.0021 on higher Apify plans | Once per company for which the Trustpilot business unit lookup completed and a non degraded row was produced, whether or not anything was found. A not_found row fires this event, because looking and finding nothing is a real answer and it is the work you asked for. A degraded row, where the lookup could not run at all, fires nothing. |
+| `reputation-resolved` | $0.0035 on the Free plan, down to $0.00245 on higher Apify plans | Once per company where a Trustpilot business unit was found and its aggregate record returned. Does not fire on a company with no business unit, does not fire when Trustpilot refused the request, and does not fire when no API key was supplied, because in all three cases no reputation record was produced. |
+| `public-page-profile-returned` | $0.005 on the Free plan, down to $0.0035 on higher Apify plans | Once per company resolved through the optional public page route, which only runs when you set publicPageAccess to unblocker. It replaces the reputation resolved charge on that row rather than adding to it, so a row is never charged twice, and a run that leaves the setting alone never fires this event at all. |
+
+The [actor's Apify page](https://apify.com/mambalabs/review-platform-reputation-enricher) carries the current prices. Running this server consumes Apify credits.
 
 ## Full actor documentation
 
