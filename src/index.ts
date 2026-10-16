@@ -6,6 +6,16 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// Optional per call spending cap, passed through to the actor's own max_charge_usd
+// input. The actor enforces it; this wrapper only forwards it when set.
+const MAX_CHARGE_USD = z
+  .number()
+  .min(0)
+  .optional()
+  .describe(
+    "Optional spending cap for this call, in USD, passed to the actor as max_charge_usd. The run stops before any charge that would take it past this amount and keeps every row already charged. Leave empty to rely only on the maximum charge per run set on your Apify account.",
+  );
+
 const here = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(
   readFileSync(join(here, "..", "package.json"), "utf8"),
@@ -77,7 +87,9 @@ async function runActor(
   actorPath: string,
   actorLabel: string,
   input: Record<string, unknown>,
+  maxChargeUsd?: number,
 ): Promise<ToolResult> {
+  if (maxChargeUsd !== undefined) input = { ...input, max_charge_usd: maxChargeUsd };
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (!APIFY_TOKEN) {
     return { isError: true, content: [{ type: "text", text: "APIFY_TOKEN is not set. Create a token at https://console.apify.com/account/integrations and set it as the APIFY_TOKEN environment variable." }] };
@@ -218,7 +230,7 @@ server.registerTool(
       "Return a company's Trustpilot rating, review count, star score, and one to five star breakdown as one flat Clay ready row. Trustpilot only: G2, Capterra, and Glassdoor ship as skipped status columns so the row shape stays fixed, and they are never fetched. By default it reads Trustpilot's public TrustBox data endpoint, which Trustpilot's robots.txt allows, and needs no Trustpilot API key. Pass trustpilotBusinessUnitId whenever you have it: with the id the lookup always resolves, while a domain alone resolves only when the company's own site embeds a Trustpilot widget. A row's trustpilot_business_id can be fed back as the id on a later call. Set publicPageAccess to unblocker to read the public company page through Apify Unblocker instead, which resolves a domain with no id and adds categories and claimed status, at a higher event price and against Trustpilot's robots.txt, so it is the caller's choice. A refused request reports blocked and a domain with no business unit reports not_found, and those two are never conflated. Do not use it for review text: it returns the aggregate, not review rows. Read only; requires an APIFY_TOKEN and consumes Apify credits per call.",
     annotations: {
       title: "Get Trustpilot Reputation",
-      readOnlyHint: true,
+      readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
       openWorldHint: true,
@@ -248,9 +260,10 @@ server.registerTool(
       skipCache: z.boolean()
         .optional()
         .describe("When \"false\" (default) a successful lookup is cached for seven days and reused, which costs nothing on a repeated run. Set \"true\" to force a fresh fetch. Sent as a string for Clay compatibility."),
+      max_charge_usd: MAX_CHARGE_USD,
     },
   },
-  async ({ company_domain, company_name, trustpilotBusinessUnitId, publicPageAccess, minReviewCount, includeCategories, sources, skipCache }) => {
+  async ({ company_domain, company_name, trustpilotBusinessUnitId, publicPageAccess, minReviewCount, includeCategories, sources, skipCache, max_charge_usd }) => {
     return runActor(
       "3lIqfCt61j4hqE1xz",
       "Trustpilot Reputation Enricher",
@@ -264,7 +277,7 @@ server.registerTool(
         sources,
         skipCache: boolToString(skipCache),
       }),
-    );
+     max_charge_usd,);
   },
 );
 
